@@ -35,7 +35,7 @@ export async function ensureKokoroRunning(): Promise<string> {
     console.error('\n[Kokoro] Docker not available. To use Kokoro TTS, either:');
     console.error('  1. Install Docker and restart');
     console.error('  2. Set CALLME_KOKORO_URL to an existing Kokoro instance');
-    console.error(`\nNote: CALLME_OPENAI_API_KEY is still required for speech-to-text.\n`);
+    console.error(`\nNote: speech-to-text needs CALLME_OPENAI_API_KEY, or CALLME_STT_PROVIDER=local.\n`);
     throw new Error('Docker required for auto-setup of Kokoro TTS');
   }
 

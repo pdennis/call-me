@@ -3,6 +3,7 @@
 > **pdennis fork.** Changes from upstream:
 > - **Tailscale Funnel instead of ngrok** — set `CALLME_PUBLIC_URL` to a fixed Funnel URL and ngrok is skipped entirely. The webhook URL never changes, so the Telnyx app is configured once.
 > - **Away mode** — `/callme:away` and `/callme:back`. When away, the Stop hook makes Claude phone you before it stops, and `AskUserQuestion` is redirected to a call. When not away, nothing calls you. Replaces upstream's LLM-evaluated Stop hook.
+> - **Fully local speech** — `CALLME_STT_PROVIDER=local` does turn detection in-process and sends each utterance to any OpenAI-compatible `/v1/audio/transcriptions` endpoint (yap, whisper.cpp, faster-whisper-server). With Kokoro TTS, no OpenAI key is needed.
 > - **One phone line** — with a fixed port, a second concurrent Claude session starts fine but its call tools report the line is busy.
 >
 > See [Fork setup](#fork-setup-tailscale-funnel--away-mode) below.
@@ -39,16 +40,19 @@ Then in `~/.claude/settings.json` (no ngrok token needed):
     "CALLME_TELNYX_PUBLIC_KEY": "<Telnyx Public Key>",
     "CALLME_PHONE_NUMBER": "+1...",
     "CALLME_USER_PHONE_NUMBER": "+1...",
-    "CALLME_OPENAI_API_KEY": "sk-...",
     "CALLME_PORT": "3333",
     "CALLME_PUBLIC_URL": "https://<host>.<tailnet>.ts.net",
     "CALLME_TTS_PROVIDER": "kokoro",
-    "CALLME_KOKORO_URL": "http://<kokoro-host>:8880/v1"
+    "CALLME_KOKORO_URL": "http://<kokoro-host>:8880/v1",
+    "CALLME_STT_PROVIDER": "local",
+    "CALLME_STT_URL": "http://<stt-host>:<port>/v1"
   }
 }
 ```
 
 Set the Telnyx Voice API application's webhook to `https://<host>.<tailnet>.ts.net/twiml`. Since the webhook is public, set `CALLME_TELNYX_PUBLIC_KEY` so signatures are verified.
+
+Local STT tuning: `CALLME_STT_SILENCE_DURATION_MS` (default 800) is the pause that ends your turn; `CALLME_STT_VAD_THRESHOLD` (default 400, 16-bit RMS) is the minimum loudness counted as speech — raise it if line noise triggers false turns. `CALLME_STT_LANGUAGE` defaults to `en`.
 
 Install from this fork:
 
