@@ -1,19 +1,29 @@
 {
   "name": "callme",
-  "version": "1.0.3",
-  "description": "Claude calls you on the phone when it needs your input or wants to report progress",
+  "version": "1.1.0",
+  "description": "Claude calls you on the phone when it needs your input or wants to report progress (pdennis fork: Tailscale Funnel + away mode)",
   "author": {
     "name": "ZeframLou",
     "url": "https://github.com/ZeframLou"
   },
-  "repository": "https://github.com/ZeframLou/call-me",
+  "repository": "https://github.com/pdennis/call-me",
   "license": "MIT",
-  "keywords": ["phone", "voice", "calls", "input"],
+  "keywords": [
+    "phone",
+    "voice",
+    "calls",
+    "input"
+  ],
   "skills": "./skills",
   "mcpServers": {
     "callme": {
       "command": "bun",
-      "args": ["run", "--cwd", "${CLAUDE_PLUGIN_ROOT}/server", "start"],
+      "args": [
+        "run",
+        "--cwd",
+        "${CLAUDE_PLUGIN_ROOT}/server",
+        "start"
+      ],
       "env": {
         "CALLME_PHONE_ACCOUNT_SID": "${CALLME_PHONE_ACCOUNT_SID}",
         "CALLME_PHONE_AUTH_TOKEN": "${CALLME_PHONE_AUTH_TOKEN}",
@@ -21,13 +31,17 @@
         "CALLME_USER_PHONE_NUMBER": "${CALLME_USER_PHONE_NUMBER}",
         "CALLME_OPENAI_API_KEY": "${CALLME_OPENAI_API_KEY}",
         "CALLME_TTS_VOICE": "${CALLME_TTS_VOICE}",
-        "CALLME_NGROK_AUTHTOKEN": "${CALLME_NGROK_AUTHTOKEN}",
+        "CALLME_NGROK_AUTHTOKEN": "${CALLME_NGROK_AUTHTOKEN:-}",
         "CALLME_PORT": "${CALLME_PORT:-0}",
         "CALLME_TRANSCRIPT_TIMEOUT_MS": "${CALLME_TRANSCRIPT_TIMEOUT_MS:-180000}",
         "CALLME_STT_SILENCE_DURATION_MS": "${CALLME_STT_SILENCE_DURATION_MS:-800}",
         "CALLME_TTS_PROVIDER": "${CALLME_TTS_PROVIDER:-openai}",
-        "CALLME_KOKORO_URL": "${CALLME_KOKORO_URL:-}"
+        "CALLME_KOKORO_URL": "${CALLME_KOKORO_URL:-}",
+        "CALLME_PHONE_PROVIDER": "${CALLME_PHONE_PROVIDER:-telnyx}",
+        "CALLME_TELNYX_PUBLIC_KEY": "${CALLME_TELNYX_PUBLIC_KEY:-}",
+        "CALLME_PUBLIC_URL": "${CALLME_PUBLIC_URL:-}"
       }
     }
-  }
+  },
+  "commands": "./commands"
 }

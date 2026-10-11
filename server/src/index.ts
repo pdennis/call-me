@@ -4,7 +4,8 @@
  * CallMe MCP Server
  *
  * A stdio-based MCP server that lets Claude call you on the phone.
- * Automatically starts ngrok to expose webhooks for phone providers.
+ * Exposes webhooks for phone providers via ngrok, or via a fixed
+ * CALLME_PUBLIC_URL (e.g. Tailscale Funnel) when one is set.
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -40,30 +41,45 @@ async function main() {
     process.exit(1);
   }
 
-  // Create call manager and bind HTTP server FIRST (before ngrok)
+  // Create call manager and bind HTTP server FIRST (before the tunnel)
   const callManager = new CallManager(serverConfig);
+  const staticPublicUrl = process.env.CALLME_PUBLIC_URL?.replace(/\/+$/, '');
   let actualPort: number;
+  // Set when another Claude session already owns the fixed port (static URL mode).
+  // We still serve MCP so this session starts cleanly, but every tool reports it.
+  let lineBusy = false;
   try {
     actualPort = await callManager.startServer();
-  } catch (error) {
-    console.error('Failed to start HTTP server:', error instanceof Error ? error.message : error);
-    process.exit(1);
+  } catch (error: any) {
+    if (staticPublicUrl && error?.code === 'EADDRINUSE') {
+      console.error(`Port ${serverConfig.port} in use - another Claude session holds the phone line`);
+      lineBusy = true;
+      actualPort = serverConfig.port;
+    } else {
+      console.error('Failed to start HTTP server:', error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
   }
 
-  // Start ngrok tunnel pointing at the actual bound port
-  console.error('Starting ngrok tunnel...');
-  let publicUrl: string;
-  try {
-    publicUrl = await startNgrok(actualPort, (newUrl) => {
-      console.error(`[ngrok] Updating public URL to: ${newUrl}`);
-      callManager.setPublicUrl(newUrl);
-    });
-    callManager.setPublicUrl(publicUrl);
-    console.error(`ngrok tunnel: ${publicUrl}`);
-  } catch (error) {
-    console.error('Failed to start ngrok:', error instanceof Error ? error.message : error);
-    await callManager.shutdown();
-    process.exit(1);
+  if (staticPublicUrl) {
+    // Fixed URL fronted by something long-lived (e.g. `tailscale funnel --bg <port>`)
+    callManager.setPublicUrl(staticPublicUrl);
+    console.error(`Static public URL: ${staticPublicUrl} -> localhost:${actualPort}`);
+  } else {
+    // Start ngrok tunnel pointing at the actual bound port
+    console.error('Starting ngrok tunnel...');
+    try {
+      const publicUrl = await startNgrok(actualPort, (newUrl) => {
+        console.error(`[ngrok] Updating public URL to: ${newUrl}`);
+        callManager.setPublicUrl(newUrl);
+      });
+      callManager.setPublicUrl(publicUrl);
+      console.error(`ngrok tunnel: ${publicUrl}`);
+    } catch (error) {
+      console.error('Failed to start ngrok:', error instanceof Error ? error.message : error);
+      await callManager.shutdown();
+      process.exit(1);
+    }
   }
 
   // Create stdio MCP server
@@ -133,6 +149,13 @@ async function main() {
   // Handle tool calls
   mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
+      if (lineBusy) {
+        throw new Error(
+          'Another Claude Code session is holding the phone line, so this session cannot place calls. ' +
+          'Tell the user in text instead.'
+        );
+      }
+
       if (request.params.name === 'initiate_call') {
         const { message } = request.params.arguments as { message: string };
         const result = await callManager.initiateCall(message);
@@ -199,7 +222,7 @@ async function main() {
       shutdownPromise = (async () => {
         console.error(`\nShutting down (${reason})...`);
         await callManager.shutdown();
-        await stopNgrok();
+        if (!staticPublicUrl) await stopNgrok();
         process.exit(exitCode);
       })();
     }

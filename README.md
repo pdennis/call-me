@@ -1,5 +1,12 @@
 # CallMe
 
+> **pdennis fork.** Changes from upstream:
+> - **Tailscale Funnel instead of ngrok** — set `CALLME_PUBLIC_URL` to a fixed Funnel URL and ngrok is skipped entirely. The webhook URL never changes, so the Telnyx app is configured once.
+> - **Away mode** — `/callme:away` and `/callme:back`. When away, the Stop hook makes Claude phone you before it stops, and `AskUserQuestion` is redirected to a call. When not away, nothing calls you. Replaces upstream's LLM-evaluated Stop hook.
+> - **One phone line** — with a fixed port, a second concurrent Claude session starts fine but its call tools report the line is busy.
+>
+> See [Fork setup](#fork-setup-tailscale-funnel--away-mode) below.
+
 **Minimal plugin that lets Claude Code call you on the phone.**
 
 Start a task, walk away. Your phone/watch rings when Claude is done, stuck, or needs a decision.
@@ -10,6 +17,47 @@ Start a task, walk away. Your phone/watch rings when Claude is done, stuck, or n
 - **Multi-turn conversations** - Talk through decisions naturally.
 - **Works anywhere** - Smartphone, smartwatch, or even landline!
 - **Tool-use composable** - Claude can e.g. do a web search while on a call with you.
+
+---
+
+## Fork setup (Tailscale Funnel + away mode)
+
+One-time, on the machine that runs Claude Code:
+
+```bash
+sudo tailscale funnel --bg 3333        # public https://<host>.<tailnet>.ts.net -> localhost:3333
+```
+
+Then in `~/.claude/settings.json` (no ngrok token needed):
+
+```json
+{
+  "env": {
+    "CALLME_PHONE_PROVIDER": "telnyx",
+    "CALLME_PHONE_ACCOUNT_SID": "<Telnyx Application ID>",
+    "CALLME_PHONE_AUTH_TOKEN": "<Telnyx API Key>",
+    "CALLME_TELNYX_PUBLIC_KEY": "<Telnyx Public Key>",
+    "CALLME_PHONE_NUMBER": "+1...",
+    "CALLME_USER_PHONE_NUMBER": "+1...",
+    "CALLME_OPENAI_API_KEY": "sk-...",
+    "CALLME_PORT": "3333",
+    "CALLME_PUBLIC_URL": "https://<host>.<tailnet>.ts.net",
+    "CALLME_TTS_PROVIDER": "kokoro",
+    "CALLME_KOKORO_URL": "http://<kokoro-host>:8880/v1"
+  }
+}
+```
+
+Set the Telnyx Voice API application's webhook to `https://<host>.<tailnet>.ts.net/twiml`. Since the webhook is public, set `CALLME_TELNYX_PUBLIC_KEY` so signatures are verified.
+
+Install from this fork:
+
+```bash
+/plugin marketplace add pdennis/call-me
+/plugin install callme@callme-pdennis
+```
+
+Use `/callme:away` before walking off and `/callme:back` when you return. The flag is `~/.claude/callme-away` (override with `CALLME_AWAY_FLAG`), shared by every session on the machine.
 
 ---
 

@@ -1,13 +1,13 @@
 {
-  "name": "callme",
+  "name": "callme-pdennis",
   "owner": {
-    "name": "ZeframLou"
+    "name": "pdennis"
   },
   "plugins": [
     {
       "name": "callme",
       "description": "Claude calls you on the phone when it needs your input or wants to report progress",
-      "version": "1.0.3",
+      "version": "1.1.0",
       "author": {
         "name": "ZeframLou",
         "url": "https://github.com/ZeframLou"
