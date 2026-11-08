@@ -784,6 +784,31 @@ export class CallManager {
     return this.httpServer;
   }
 
+  hasActiveCalls(): boolean {
+    return this.activeCalls.size > 0;
+  }
+
+  /**
+   * Give up the fixed port so another session can bind it (phone line takeover).
+   * Refuses while a call is in progress. startServer() can be called again later.
+   */
+  async releaseServer(): Promise<boolean> {
+    if (this.activeCalls.size > 0) return false;
+    this.wss?.clients.forEach(ws => ws.terminate());
+    this.wss?.close();
+    this.wss = null;
+    const server = this.httpServer;
+    this.httpServer = null;
+    if (server) {
+      await new Promise<void>(resolve => {
+        server.close(() => resolve());
+        // Keep-alive webhook connections would otherwise hold close() open
+        (server as any).closeAllConnections?.();
+      });
+    }
+    return true;
+  }
+
   private _shutdownPromise: Promise<void> | null = null;
 
   shutdown(): Promise<void> {

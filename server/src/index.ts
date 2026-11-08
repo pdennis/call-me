@@ -13,6 +13,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { CallManager, loadServerConfig } from './phone-call.js';
 import { startNgrok, stopNgrok } from './ngrok.js';
+import { PhoneLine } from './phone-line.js';
 import { ensureKokoroRunning } from './providers/tts-kokoro.js';
 import { loadProviderConfig } from './providers/index.js';
 
@@ -44,21 +45,22 @@ async function main() {
   // Create call manager and bind HTTP server FIRST (before the tunnel)
   const callManager = new CallManager(serverConfig);
   const staticPublicUrl = process.env.CALLME_PUBLIC_URL?.replace(/\/+$/, '');
+  // In static URL mode the fixed port is one phone line shared by every session on
+  // this machine; see phone-line.ts. Starting up never takes it from another session.
+  const line = new PhoneLine(callManager, serverConfig.port);
   let actualPort: number;
-  // Set when another Claude session already owns the fixed port (static URL mode).
-  // We still serve MCP so this session starts cleanly, but every tool reports it.
-  let lineBusy = false;
   try {
-    actualPort = await callManager.startServer();
-  } catch (error: any) {
-    if (staticPublicUrl && error?.code === 'EADDRINUSE') {
-      console.error(`Port ${serverConfig.port} in use - another Claude session holds the phone line`);
-      lineBusy = true;
+    if (staticPublicUrl) {
+      if (!(await line.tryAcquire())) {
+        console.error(`Port ${serverConfig.port} in use - another Claude session holds the phone line; will take it over on initiate_call`);
+      }
       actualPort = serverConfig.port;
     } else {
-      console.error('Failed to start HTTP server:', error instanceof Error ? error.message : error);
-      process.exit(1);
+      actualPort = await callManager.startServer();
     }
+  } catch (error) {
+    console.error('Failed to start HTTP server:', error instanceof Error ? error.message : error);
+    process.exit(1);
   }
 
   if (staticPublicUrl) {
@@ -149,11 +151,14 @@ async function main() {
   // Handle tool calls
   mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
-      if (lineBusy) {
-        throw new Error(
-          'Another Claude Code session is holding the phone line, so this session cannot place calls. ' +
-          'Tell the user in text instead.'
-        );
+      if (staticPublicUrl && !line.held) {
+        if (request.params.name !== 'initiate_call') {
+          throw new Error(
+            'Another Claude Code session has taken over the phone line, so this call is over. ' +
+            'Tell the user in text instead.'
+          );
+        }
+        await line.takeOver();
       }
 
       if (request.params.name === 'initiate_call') {
@@ -222,6 +227,7 @@ async function main() {
       shutdownPromise = (async () => {
         console.error(`\nShutting down (${reason})...`);
         await callManager.shutdown();
+        line.close();
         if (!staticPublicUrl) await stopNgrok();
         process.exit(exitCode);
       })();

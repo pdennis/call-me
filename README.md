@@ -4,7 +4,7 @@
 > - **Tailscale Funnel instead of ngrok** — set `CALLME_PUBLIC_URL` to a fixed Funnel URL and ngrok is skipped entirely. The webhook URL never changes, so the Telnyx app is configured once.
 > - **Away mode** — `/callme:away` and `/callme:back`. When away, the Stop hook makes Claude phone you before it stops, and `AskUserQuestion` is redirected to a call. When not away, nothing calls you. Replaces upstream's LLM-evaluated Stop hook.
 > - **Fully local speech** — `CALLME_STT_PROVIDER=local` does turn detection in-process and sends each utterance to any OpenAI-compatible `/v1/audio/transcriptions` endpoint (yap, whisper.cpp, faster-whisper-server). With Kokoro TTS, no OpenAI key is needed.
-> - **One phone line** — with a fixed port, a second concurrent Claude session starts fine but its call tools report the line is busy.
+> - **One phone line, handed off on demand** — with a fixed port only one session holds the line. A session that calls `initiate_call` without it asks the holder (over a Unix socket in `$XDG_RUNTIME_DIR`, never the funnelled port) to let go; the holder agrees unless it is on a call. So a forgotten idle session can't keep the line, and a live call is never cut off. Starting a session never takes the line.
 >
 > See [Fork setup](#fork-setup-tailscale-funnel--away-mode) below.
 

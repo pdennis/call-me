@@ -1,6 +1,6 @@
 {
   "name": "callme",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Claude calls you on the phone when it needs your input or wants to report progress (pdennis fork: Tailscale Funnel, local STT/TTS, away mode)",
   "author": {
     "name": "ZeframLou",
